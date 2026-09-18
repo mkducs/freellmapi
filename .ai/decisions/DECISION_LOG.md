@@ -93,3 +93,57 @@ in deliberately.
 not invent specs on its own." The candidates came out of a real analysis
 session and are evidence-backed, but promoting them to pending is the human's
 call, not the agent's.
+
+---
+
+## DL-0005 — U-001 resolved: a merge to `main` is a release
+
+Date: 2026-09-18 · Status: Accepted · Confidence: High
+
+**Decision.** Record that `main` is wired to automatic publication, and treat
+DL-0002's merge gate as confirmed on the scaffold's own criterion rather than
+only on this project's review conventions.
+
+**Evidence.** `.github/workflows/cli-release.yml` runs on `push: branches:
+[main]` and publishes the CLI to npm with OIDC trusted publishing.
+`.github/workflows/docker.yml` runs on the same trigger and pushes an image to
+ghcr. Neither is gated behind an environment approval.
+
+**Consequence.** `CLAUDE.md` Section 11's test — "if this repository's default
+branch is wired to an automatic deployment, that merge is a production
+deployment" — is met. No policy change needed; DL-0002 already put merge under
+Section 12. `project.md` now records the wiring so no future task re-derives it.
+
+---
+
+## DL-0006 — Provider tier facts go in a new table, not on `models`
+
+Date: 2026-09-18 · Status: Proposed (see ADR-0001) · Confidence: High on shape
+
+**Decision.** Model the free-tier registry as a provider-level
+`provider_registry` table plus three nullable model-level columns, delivered
+through a new `providers` array in the signed catalog. Full reasoning, DDL,
+types and rejected alternatives in `.ai/decisions/ADR-0001-provider-registry-schema.md`.
+
+**Reasoning in brief.** The operator proposed a flat provider schema carrying
+rpm/tpm/rpd alongside licence and card fields. Half of that already exists per
+model in `models`, and duplicating it across ~635 provider endpoints would
+create rows that disagree. The genuinely missing half is tier semantics —
+`free_type`, `card_required`, `commercial_allowed`, `production_allowed`,
+`last_verified_at`, `quota_source_url` — which is provider-scoped and belongs
+in its own table.
+
+**Why now.** Three independent incidents already needed this field set:
+SambaNova (a free tier that lapsed, with no way to express "will expire"),
+Cohere (trial keys documented as not for production, routed as ordinary
+candidates today), and ElevenLabs (assessed as a clean technical fit, blocked
+on a non-commercial licence the catalog cannot carry).
+
+**Rejected.** Columns on `models`; a single `free: boolean` (the status quo
+that produced all three incidents); provider facts in code (needs a release to
+correct a quota claim); a generic key/value metadata table (no types, no
+constraints).
+
+**Open.** The enum boundaries for `free_type`, and whether
+`commercial_allowed` is provider-level often enough to justify its position —
+tracked as U-007 and as ADR-0001's reversal condition.

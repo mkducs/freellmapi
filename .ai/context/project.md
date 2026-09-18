@@ -59,9 +59,15 @@ Record what actually ran, with output, in `.ai/verification/`.
 
 - Default branch: `main`. Work happens on operator-named feature branches.
 - PRs carry human review and a Claude Approvals check.
-- `main` feeds the published catalog and the release pipeline that existing
-  installs pull from — which is why merging is a Section 12 stop here
-  (`CLAUDE.md` Sections 5, 11, 12).
+- **A merge to `main` is a release.** Verified 2026-09-18 by reading
+  `.github/workflows/`: `cli-release.yml` publishes the CLI to npm via OIDC
+  trusted publishing on push to `main`, and `docker.yml` pushes an image to
+  ghcr on push to `main`. `desktop-release.yml` fires on `v*` tags.
+  This is why merging is a Section 12 stop here (`CLAUDE.md` Sections 5, 11,
+  12) — it meets the scaffold's own "default branch wired to automatic
+  deployment" criterion, not just this project's review conventions.
+- CI on PRs: `ci.yml`, plus `docker.yml` and `desktop-release.yml` build (but
+  do not publish) on pull requests.
 - `CONTRIBUTING.md` holds the commit checklist. `.claude/hooks/contributing-check.mjs`
   can inject it at commit time but ships unwired by default; leave it that way
   unless asked.
