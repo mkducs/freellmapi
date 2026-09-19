@@ -240,6 +240,80 @@ export interface Model {
   source?: 'catalog' | 'custom';
   keyId?: number | null;
   endpointScope?: string | null;
+  /** Per-model override of the provider's commercial stance (ADR-0001).
+   *  Undefined/null means inherit `ProviderRegistry.commercialAllowed` — the
+   *  common case. Set only where a model genuinely diverges from its gateway,
+   *  e.g. an OpenRouter `:free` route inheriting its upstream model's licence. */
+  commercialAllowed?: CommercialStance | null;
+  /** Licence of the weights themselves ('apache-2.0', 'llama-3.1', …), which is
+   *  often the real answer to "can I use this commercially" on a gateway. */
+  modelLicense?: string | null;
+  supportsStructured?: boolean;
+}
+
+// ---- Provider registry (ADR-0001) ----
+
+/** What kind of "free" a provider offers. The distinction the old boolean could
+ *  not draw: a permanent allowance, a credit that refills, and a grant that
+ *  burns down are three different things to a router that has to keep working
+ *  next month. */
+export type ProviderFreeType =
+  /** Recurring allowance, no expiry, no card (groq, google, cloudflare). */
+  | 'permanent'
+  /** Credit that refills on a period (electronhub weekly, router9 monthly). */
+  | 'credit_recurring'
+  /** Grant that burns down and never refills — the SambaNova failure mode. */
+  | 'credit_one_time'
+  /** Time-boxed vendor promotion (bai, agnes, opencode). */
+  | 'promotional'
+  /** Works anonymously, no key at all (kilo, ovh, aihorde). */
+  | 'keyless'
+  /** Recurring, but only while a payment method is attached (sail). */
+  | 'card_backed'
+  /** Was free, no longer is. Kept so history is representable (sambanova). */
+  | 'retired'
+  /** Advertised but never demonstrated under test (anyapi). */
+  | 'unverified';
+
+/** Whether a tier's terms permit a class of use. 'unknown' is the honest
+ *  default and is never silently treated as 'yes'. */
+export type CommercialStance = 'yes' | 'no' | 'model_dependent' | 'unknown';
+
+/** How a tier claim was established. A vendor's pricing page and a live probe
+ *  that actually got served are not the same evidence (the AnyAPI lesson). */
+export type VerificationMethod = 'live_probe' | 'official_docs' | 'third_party' | 'unverified';
+
+/** Extra signup step beyond creating an account. */
+export type SignupVerification = 'discord' | 'telegram' | 'cn_realname' | 'phone';
+
+/** One row of the free-tier registry — provider-scoped facts that no per-model
+ *  row can carry. See ADR-0001. */
+export interface ProviderRegistry {
+  platform: Platform;
+  freeType: ProviderFreeType;
+  freeCredits: number | null;
+  freeCreditsCurrency: string | null;
+  freeCreditsPeriod: 'daily' | 'weekly' | 'monthly' | 'one_time' | null;
+  freeExpiresAfterDays: number | null;
+  cardRequired: boolean;
+  signupVerification: SignupVerification | null;
+  keyless: boolean;
+  commercialAllowed: CommercialStance;
+  commercialRestriction: string | null;
+  productionAllowed: CommercialStance;
+  /** Account-wide caps. Mirrors the constants in services/ratelimit.ts; the
+   *  readers there have not been migrated onto these yet. */
+  accountRpmCap: number | null;
+  accountRpdCap: number | null;
+  accountTpdCap: number | null;
+  /** ISO8601, or null when nothing has ever verified this row. Null is not a
+   *  gap to fill in with a guess — it is the accurate state after a backfill,
+   *  because backfill is not verification. */
+  lastVerifiedAt: string | null;
+  verifiedMethod: VerificationMethod | null;
+  quotaSourceUrl: string | null;
+  notes: string | null;
+  updatedAt: string;
 }
 
 // ---- Quirks ----

@@ -1,9 +1,11 @@
 # ADR-0001 — Free-tier provider registry schema
 
-Status: Proposed
-Date: 2026-09-18
-Deciders: autonomous (L2), pending human review
+Status: Accepted
+Date: 2026-09-18 (accepted 2026-09-19 by the operator)
+Deciders: autonomous (L2), accepted by the operator
 Confidence: High on the shape, Medium on the enum boundaries
+Implemented by: `.ai/plans/active/provider-registry-schema.md` — schema and
+catalog transport only; the `commercial_use` routing filter remains unbuilt.
 
 ## Context
 

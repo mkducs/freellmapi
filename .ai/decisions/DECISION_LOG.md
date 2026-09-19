@@ -147,3 +147,75 @@ constraints).
 **Open.** The enum boundaries for `free_type`, and whether
 `commercial_allowed` is provider-level often enough to justify its position —
 tracked as U-007 and as ADR-0001's reversal condition.
+
+---
+
+## DL-0007 — Reading "Approved" as ADR acceptance, not merge authorisation
+
+Date: 2026-09-19 · Status: Accepted · Confidence: Medium-High
+
+**Decision.** Treat the operator's one-word "Approved" as acceptance of
+ADR-0001 and authorisation to implement it. Do **not** read it as approval to
+merge PR #1.
+
+**Reasoning.** The message it answered ended by flagging the ADR as
+"Status: Proposed, pending human review" and offering to split the branch, so
+the ADR is the nearest referent. The competing reading — approval to merge — is
+a Section 12 action, where Section 16 requires a stop-and-ask rather than an
+inference from an ambiguous word. Reading it narrowly is also the recoverable
+error: if the operator did mean the split or the merge, nothing is lost but a
+question, whereas a wrong merge publishes to npm and ghcr (DL-0005).
+
+**Rejected.** (a) Merging PR #1 — Section 12, and no autonomy level permits
+inferring it. (b) Stopping to ask before doing anything — the ADR reading is
+strongly supported by context, and rule 15 says to decide and log rather than
+block on a judgment call that evidence can settle.
+
+**Scope of the implementation.** ADR-0001's `commercial_use` routing filter is
+deliberately excluded: it changes routing behaviour and deserves its own plan,
+tests and review (rule 8, smallest coherent change). Schema, types, catalog
+transport and tests only — the schema lands inert.
+
+---
+
+## DL-0008 — The models rebuild must preserve columns added after it
+
+Date: 2026-09-19 · Status: Accepted · Confidence: High
+
+**Decision.** Change `rebuildModels()` in the 2026-07-29 endpoint-identity
+migration so that columns present on the live `models` table but unknown to that
+migration are carried through its rebuild, instead of being silently dropped.
+
+**Discovery.** Implementing ADR-0001 added the first `models` column since July.
+The full suite immediately failed `endpoint-identity.test.ts > is idempotent
+across a down/up round trip`. Root cause: that migration rebuilds `models` from
+a column list frozen at its own date (SQLite cannot drop a table-level UNIQUE,
+so the table is recreated). Any later column — and its data — is destroyed on a
+re-run. The comment above the list says it is written out in full "so the
+rebuilt schema is auditable here and identical on every run", which is a good
+reason to freeze what it CREATES and not a reason to destroy what it does not
+know about.
+
+**Why fix it rather than work around it.** The alternatives were worse.
+Adding the new columns to the old migration's frozen list would misrepresent the
+schema as of its date and diverge column order between fresh and upgraded
+installs. Relaxing the test's exact-text comparison would hide a real data-loss
+bug to make this change pass — the test is correct and was doing its job.
+Putting the three fields somewhere other than `models` to dodge the area would
+contort ADR-0001's design around a latent defect rather than fixing it.
+
+**Two details worth knowing.** `endpoint_scope` is excluded from preservation
+explicitly, because that migration owns it and `down()` exists to remove it.
+Carried columns are rendered exactly as SQLite renders `ALTER TABLE ADD COLUMN`
+into the stored CREATE text, so the rebuilt schema stays byte-identical to the
+ALTER-produced one and the roundtrip test keeps its strict comparison.
+
+**Scope.** This is the rule-9 path in CLAUDE.md Section 9 — implementation
+revealed the plan was incomplete, so the discovery is logged and the work
+continued. Not a Section 12 item: no production data is touched by the change
+itself, though it does alter a migration that has already run on user databases,
+which is called out for reviewers in the verification report.
+
+**Reversal condition.** If a future migration needs the rebuild to intentionally
+drop a column, it must add that column name to the `known` set the way
+`endpoint_scope` is, rather than reverting this behaviour wholesale.
