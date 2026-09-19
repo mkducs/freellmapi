@@ -117,6 +117,32 @@ interface CatalogModel {
   requestStyle?: string | null;
 }
 
+/** Free-tier facts for a whole platform (ADR-0001). A NEW top-level key rather
+ *  than fields on `models`: the same licence or card fact repeated across every
+ *  one of a platform's rows invites rows that disagree, and binaries predating
+ *  this key ignore an unknown optional array rather than misreading it. */
+interface CatalogProvider {
+  platform: string;
+  freeType: string;
+  freeCredits?: number | null;
+  freeCreditsCurrency?: string | null;
+  freeCreditsPeriod?: string | null;
+  freeExpiresAfterDays?: number | null;
+  cardRequired?: boolean;
+  signupVerification?: string | null;
+  keyless?: boolean;
+  commercialAllowed?: string;
+  commercialRestriction?: string | null;
+  productionAllowed?: string;
+  accountRpmCap?: number | null;
+  accountRpdCap?: number | null;
+  accountTpdCap?: number | null;
+  lastVerifiedAt?: string | null;
+  verifiedMethod?: string | null;
+  quotaSourceUrl?: string | null;
+  notes?: string | null;
+}
+
 interface CatalogEmbedding {
   family: string;
   platform: string;
@@ -178,6 +204,10 @@ interface Catalog {
   /** Text-to-video registry. Kept out of `models` so pre-video binaries ignore
    *  it rather than routing unknown-modality rows through chat. */
   videoModels?: CatalogVideoModel[];
+  /** Free-tier registry, one entry per platform. Optional: a catalog published
+   *  before ADR-0001 simply omits it, and an omitted key must leave existing
+   *  provider_registry rows untouched rather than clearing them. */
+  providers?: CatalogProvider[];
   quirks: CatalogQuirk[];
 }
 
@@ -224,6 +254,24 @@ function isCatalog(value: unknown): value is Catalog {
               (Array.isArray(m.subtitleFormats) && m.subtitleFormats.every((f) => typeof f === 'string'))) &&
             (m.maxBytes === undefined || m.maxBytes === null || typeof m.maxBytes === 'number') &&
             (m.requestStyle === undefined || m.requestStyle === null || typeof m.requestStyle === 'string'),
+        ))) &&
+    (c.providers === undefined ||
+      (Array.isArray(c.providers) &&
+        c.providers.every(
+          (p) =>
+            typeof p?.platform === 'string' &&
+            typeof p?.freeType === 'string' &&
+            (p.freeCredits === undefined || p.freeCredits === null || typeof p.freeCredits === 'number') &&
+            (p.freeExpiresAfterDays === undefined || p.freeExpiresAfterDays === null ||
+              typeof p.freeExpiresAfterDays === 'number') &&
+            (p.cardRequired === undefined || typeof p.cardRequired === 'boolean') &&
+            (p.keyless === undefined || typeof p.keyless === 'boolean') &&
+            (p.commercialAllowed === undefined || typeof p.commercialAllowed === 'string') &&
+            (p.productionAllowed === undefined || typeof p.productionAllowed === 'string') &&
+            (p.accountRpmCap === undefined || p.accountRpmCap === null || typeof p.accountRpmCap === 'number') &&
+            (p.accountRpdCap === undefined || p.accountRpdCap === null || typeof p.accountRpdCap === 'number') &&
+            (p.accountTpdCap === undefined || p.accountTpdCap === null || typeof p.accountTpdCap === 'number') &&
+            (p.lastVerifiedAt === undefined || p.lastVerifiedAt === null || typeof p.lastVerifiedAt === 'string'),
         ))) &&
     (c.videoModels === undefined ||
       (Array.isArray(c.videoModels) &&
@@ -341,6 +389,43 @@ function applyCatalogInner(db: Db, catalog: Catalog): NonNullable<SyncResult['co
     VALUES
       (@family, @platform, @modelId, @displayName, @dimensions, @maxInputTokens,
        @priority, @enabled, @quotaLabel)
+  `);
+
+  const selectProvider = db.prepare('SELECT platform FROM provider_registry WHERE platform = ?');
+  const upsertProvider = db.prepare(`
+    INSERT INTO provider_registry (
+      platform, free_type, free_credits, free_credits_currency, free_credits_period,
+      free_expires_after_days, card_required, signup_verification, keyless,
+      commercial_allowed, commercial_restriction, production_allowed,
+      account_rpm_cap, account_rpd_cap, account_tpd_cap,
+      last_verified_at, verified_method, quota_source_url, notes, updated_at
+    ) VALUES (
+      @platform, @freeType, @freeCredits, @freeCreditsCurrency, @freeCreditsPeriod,
+      @freeExpiresAfterDays, @cardRequired, @signupVerification, @keyless,
+      @commercialAllowed, @commercialRestriction, @productionAllowed,
+      @accountRpmCap, @accountRpdCap, @accountTpdCap,
+      @lastVerifiedAt, @verifiedMethod, @quotaSourceUrl, @notes, datetime('now')
+    )
+    ON CONFLICT(platform) DO UPDATE SET
+      free_type = excluded.free_type,
+      free_credits = excluded.free_credits,
+      free_credits_currency = excluded.free_credits_currency,
+      free_credits_period = excluded.free_credits_period,
+      free_expires_after_days = excluded.free_expires_after_days,
+      card_required = excluded.card_required,
+      signup_verification = excluded.signup_verification,
+      keyless = excluded.keyless,
+      commercial_allowed = excluded.commercial_allowed,
+      commercial_restriction = excluded.commercial_restriction,
+      production_allowed = excluded.production_allowed,
+      account_rpm_cap = excluded.account_rpm_cap,
+      account_rpd_cap = excluded.account_rpd_cap,
+      account_tpd_cap = excluded.account_tpd_cap,
+      last_verified_at = excluded.last_verified_at,
+      verified_method = excluded.verified_method,
+      quota_source_url = excluded.quota_source_url,
+      notes = excluded.notes,
+      updated_at = datetime('now')
   `);
 
   const apply = db.transaction(() => {
@@ -533,6 +618,47 @@ function applyCatalogInner(db: Db, catalog: Catalog): NonNullable<SyncResult['co
           insertTranscription.run({ ...fields, platform: m.platform, modelId: m.modelId, enabled: m.enabled ? 1 : 0 });
           counts.inserted++;
         }
+      }
+    }
+
+    // Provider registry rows. Gated on hasProvider() like every other array —
+    // a platform this binary does not know about must not leave an orphan row
+    // that the dashboard would render as a provider the router cannot reach.
+    // Deliberately NOT a full snapshot: an omitted `providers` key means "this
+    // catalog says nothing about tiers", not "clear the table", so older
+    // catalogs cannot wipe what a newer one established.
+    if (catalog.providers) {
+      for (const p of catalog.providers) {
+        if (!hasProvider(p.platform as Platform)) {
+          counts.skippedUnknownPlatform++;
+          continue;
+        }
+        const existing = selectProvider.get(p.platform) as { platform: string } | undefined;
+        upsertProvider.run({
+          platform: p.platform,
+          freeType: p.freeType,
+          freeCredits: p.freeCredits ?? null,
+          freeCreditsCurrency: p.freeCreditsCurrency ?? null,
+          freeCreditsPeriod: p.freeCreditsPeriod ?? null,
+          freeExpiresAfterDays: p.freeExpiresAfterDays ?? null,
+          cardRequired: p.cardRequired ? 1 : 0,
+          signupVerification: p.signupVerification ?? null,
+          keyless: p.keyless ? 1 : 0,
+          // 'unknown' rather than 'yes' when the catalog is silent: an absent
+          // licence claim is not permission (Section 14).
+          commercialAllowed: p.commercialAllowed ?? 'unknown',
+          commercialRestriction: p.commercialRestriction ?? null,
+          productionAllowed: p.productionAllowed ?? 'unknown',
+          accountRpmCap: p.accountRpmCap ?? null,
+          accountRpdCap: p.accountRpdCap ?? null,
+          accountTpdCap: p.accountTpdCap ?? null,
+          lastVerifiedAt: p.lastVerifiedAt ?? null,
+          verifiedMethod: p.verifiedMethod ?? null,
+          quotaSourceUrl: p.quotaSourceUrl ?? null,
+          notes: p.notes ?? null,
+        });
+        if (existing) counts.updated++;
+        else counts.inserted++;
       }
     }
 

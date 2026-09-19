@@ -74,8 +74,66 @@ function childTablesOfModels(db: Db): string[] {
     .map(t => t.name);
 }
 
+/** Column names declared in one of this file's own schema fragments. Each
+ *  fragment lists one column per line, so the first token of a line is its
+ *  name. */
+function declaredColumnNames(fragment: string): string[] {
+  return fragment
+    .split('\n')
+    .map(line => line.trim().replace(/^,/, '').trim())
+    .filter(line => line && !line.startsWith('UNIQUE') && !line.startsWith('--'))
+    .map(line => line.split(/[\s(]/)[0]!.replace(/["`]/g, ''))
+    .filter(Boolean);
+}
+
+/** Columns that migrations AFTER this one added to `models`.
+ *
+ *  The snapshot above is deliberately frozen at this migration's own date, and
+ *  that is right for what it CREATES. But the rebuild must not DESTROY what
+ *  came later: re-running up(), or a down/up round trip, on an up-to-date
+ *  database would otherwise drop every later column and the data in it.
+ *  Nothing hit this until a later migration first added a `models` column —
+ *  the roundtrip test caught it the moment one did.
+ *
+ *  Definitions are read off the live schema rather than guessed, so a column
+ *  this file has never heard of survives with its own type, NOT NULL and
+ *  DEFAULT intact. */
+function laterAddedColumns(db: Db, known: Set<string>): { defs: string[]; names: string[] } {
+  const info = db.prepare('PRAGMA table_info(models)').all() as
+    { name: string; type: string; notnull: number; dflt_value: string | null }[];
+  const defs: string[] = [];
+  const names: string[] = [];
+  for (const col of info) {
+    if (known.has(col.name)) continue;
+    // Rendered the way SQLite renders an ALTER TABLE ADD COLUMN into the stored
+    // CREATE text — bare identifier, space-separated, on the same line — so a
+    // rebuilt table's schema is byte-identical to the one ALTER produced. The
+    // roundtrip test compares that text exactly, and it should keep being able
+    // to.
+    let def = col.name;
+    if (col.type) def += ` ${col.type}`;
+    if (col.notnull) def += ' NOT NULL';
+    if (col.dflt_value !== null) def += ` DEFAULT ${col.dflt_value}`;
+    defs.push(def);
+    names.push(col.name);
+  }
+  return { defs, names };
+}
+
 function rebuildModels(db: Db, extraColumns: string, copiedColumns: string, unique: string): void {
   const children = childTablesOfModels(db);
+  // Everything this migration itself owns: its frozen snapshot, plus the column
+  // it exists to add. `endpoint_scope` must be listed whichever direction we are
+  // running — up() creates it, and down() removes it on purpose, so it is never
+  // a "later added column" to be preserved.
+  const known = new Set([
+    ...declaredColumnNames(MODELS_COLUMNS),
+    ...declaredColumnNames(extraColumns),
+    'endpoint_scope',
+  ]);
+  const later = laterAddedColumns(db, known);
+  const laterDefs = later.defs.length ? `, ${later.defs.join(', ')}` : '';
+  const carried = later.names.length ? `${copiedColumns}, ${later.names.join(', ')}` : copiedColumns;
   // AUTOINCREMENT's high-water mark. DROP TABLE takes the sqlite_sequence row
   // with it, and copying rows back only pushes the counter to the highest id
   // PRESENT — so a table whose top rows were deleted (catalog sync prunes
@@ -90,11 +148,11 @@ function rebuildModels(db: Db, extraColumns: string, copiedColumns: string, uniq
   }
 
   db.exec(`
-    CREATE TABLE models_endpoint_identity (${MODELS_COLUMNS}${extraColumns},
+    CREATE TABLE models_endpoint_identity (${MODELS_COLUMNS}${extraColumns}${laterDefs},
       ${unique}
     );
-    INSERT INTO models_endpoint_identity (${copiedColumns})
-      SELECT ${copiedColumns} FROM models;
+    INSERT INTO models_endpoint_identity (${carried})
+      SELECT ${carried} FROM models;
     DROP TABLE models;
     ALTER TABLE models_endpoint_identity RENAME TO models;
   `);

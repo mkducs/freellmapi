@@ -669,3 +669,109 @@ describe('applyCatalog: generative media meta', () => {
     expect(reapplyCachedCatalog().reapplied).toBe(false);
   });
 });
+
+// The free-tier registry (ADR-0001) is a dedicated optional top-level key for
+// the same backward-compatibility reason as the media registries: a binary
+// released before it ignores an unknown key, while fields smuggled into
+// `models` would be misread. These tests lock the gating, the merge semantics,
+// the conservative defaults, and the rejection rule.
+describe('applyCatalog: providers', () => {
+  type CatalogProviderEntry = NonNullable<AnyCatalog['providers']>[number];
+
+  beforeAll(() => {
+    process.env.ENCRYPTION_KEY = '0'.repeat(64);
+    initDb(':memory:');
+  });
+
+  function providerCatalog(entries?: CatalogProviderEntry[]): AnyCatalog {
+    const catalog = catalogOf(existingAsCatalogModels());
+    if (entries) catalog.providers = entries;
+    return catalog;
+  }
+
+  function providerRow(platform: string): Record<string, unknown> | undefined {
+    return getDb()
+      .prepare('SELECT * FROM provider_registry WHERE platform = ?')
+      .get(platform) as Record<string, unknown> | undefined;
+  }
+
+  it('writes a row for a registered platform', () => {
+    applyCatalog(getDb(), providerCatalog([{
+      platform: 'groq',
+      freeType: 'permanent',
+      cardRequired: false,
+      commercialAllowed: 'yes',
+      productionAllowed: 'yes',
+      accountRpdCap: 1000,
+      lastVerifiedAt: '2026-09-18T00:00:00Z',
+      verifiedMethod: 'official_docs',
+      quotaSourceUrl: 'https://console.groq.com/docs/rate-limits',
+    }]));
+
+    const row = providerRow('groq')!;
+    expect(row.free_type).toBe('permanent');
+    expect(row.card_required).toBe(0);
+    expect(row.commercial_allowed).toBe('yes');
+    expect(row.account_rpd_cap).toBe(1000);
+    expect(row.verified_method).toBe('official_docs');
+  });
+
+  it('defaults an unstated licence to unknown, never to permitted', () => {
+    applyCatalog(getDb(), providerCatalog([
+      { platform: 'cerebras', freeType: 'card_backed' },
+    ]));
+
+    const row = providerRow('cerebras')!;
+    // A catalog that says nothing about commercial use has not granted it.
+    expect(row.commercial_allowed).toBe('unknown');
+    expect(row.production_allowed).toBe('unknown');
+    expect(row.last_verified_at).toBeNull();
+  });
+
+  it('skips and counts a platform this binary does not know', () => {
+    const before = providerRow('not_a_real_platform');
+    const counts = applyCatalog(getDb(), providerCatalog([
+      { platform: 'not_a_real_platform', freeType: 'permanent' },
+    ]));
+
+    expect(before).toBeUndefined();
+    expect(providerRow('not_a_real_platform')).toBeUndefined();
+    expect(counts.skippedUnknownPlatform).toBeGreaterThanOrEqual(1);
+  });
+
+  it('updates an existing row in place rather than duplicating it', () => {
+    applyCatalog(getDb(), providerCatalog([
+      { platform: 'groq', freeType: 'permanent', commercialAllowed: 'yes' },
+    ]));
+    applyCatalog(getDb(), providerCatalog([
+      { platform: 'groq', freeType: 'retired', commercialAllowed: 'no' },
+    ]));
+
+    const rows = getDb()
+      .prepare('SELECT * FROM provider_registry WHERE platform = ?')
+      .all('groq') as Record<string, unknown>[];
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.free_type).toBe('retired');
+    expect(rows[0]!.commercial_allowed).toBe('no');
+  });
+
+  it('a catalog with no providers key leaves existing rows untouched', () => {
+    applyCatalog(getDb(), providerCatalog([
+      { platform: 'groq', freeType: 'permanent' },
+    ]));
+
+    // An older catalog says nothing about tiers; it must not clear the table.
+    applyCatalog(getDb(), providerCatalog());
+
+    expect(providerRow('groq')!.free_type).toBe('permanent');
+  });
+
+  it('a malformed providers key rejects the whole payload', () => {
+    const catalog = providerCatalog([
+      { platform: 'groq', freeType: 'permanent' },
+    ]);
+    (catalog as any).providers = [{ platform: 'groq', freeType: 12 }]; // freeType must be a string
+    setSetting('catalog_applied_json', JSON.stringify(catalog));
+    expect(reapplyCachedCatalog().reapplied).toBe(false);
+  });
+});
