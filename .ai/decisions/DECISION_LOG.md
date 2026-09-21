@@ -219,3 +219,48 @@ which is called out for reviewers in the verification report.
 **Reversal condition.** If a future migration needs the rebuild to intentionally
 drop a column, it must add that column name to the `known` set the way
 `endpoint_scope` is, rather than reverting this behaviour wholesale.
+
+---
+
+## DL-0009 — The providers page is generated from PLATFORMS, not written by hand
+
+Date: 2026-09-21 · Status: Accepted · Confidence: High
+
+**Decision.** Ship `docs/providers.html` as a build product of the PLATFORMS
+registry in `client/src/components/keys/shared.tsx`, produced by
+`scripts/generate-providers-page.mjs`, with a `--check` mode wired into a test
+that fails when the committed page drifts from the registry.
+
+**Reasoning.** A hand-written page listing 49 providers is correct exactly once.
+This repository already has the evidence: `docs/en/providers/01-supported-platforms.md`
+drifted to claiming 45 platforms while the union had grown to 49, and its
+catalog table is missing five registered providers — nothing failed, because
+nothing checked. The registry changes often enough that a static copy is a
+liability. Generating it makes the page structurally incapable of disagreeing
+with what the dashboard renders, and the repo already has the pattern to hang
+it on (`scripts/dev-bootstrap.mjs` + a colocated `node --test` file wired into
+`npm test`).
+
+**Access badges are derived, not re-listed.** The `keyless` flag and the label
+text already encode "no key needed", "payment method", "Discord verification"
+and "cn real-name". Classifying from those strings avoids a second
+hand-maintained list that could contradict the first.
+
+**Rejected.** (a) Committing the hand-built page from earlier in this session —
+correct today, stale on the next provider. (b) Generating at build time without
+committing the output — loses the ability to read the page from the repo and
+gives the drift check nothing to compare against. (c) Refactoring PLATFORMS into
+a shared data module both the client and the script import — cleaner in
+principle, but it touches client source for a docs artifact, which is a bigger
+blast radius than this change warrants.
+
+**Known weakness.** The generator regex-parses TypeScript. Mitigated by failing
+loudly rather than quietly: a platform floor, duplicate-id and empty-label
+checks, and a whole-file comparison in the test. Two real bugs surfaced this way
+during implementation — a missed trailing comma in `CUSTOM_GROUP` that silently
+dropped an entry, and ModelScope's "cn binding" wording escaping the CN
+classification.
+
+**Reversal condition.** If PLATFORMS ever moves into a plain data module (JSON
+or a `.ts` with no JSX imports), replace the parser with a direct import — the
+generator and its tests stay, only the parse changes.

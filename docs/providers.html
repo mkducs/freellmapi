@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FreeLLMAPI — supported providers</title>
+<meta name="description" content="Every provider FreeLLMAPI supports, with the page that issues its API key.">
+<!--
+  GENERATED FILE — do not edit by hand.
+  Source: client/src/components/keys/shared.tsx (PLATFORMS)
+  Regenerate: npm run providers:page
+  Verified by: npm run test:providers-page
+-->
+<style>
+  :root{--bg:#fbfaf9;--surface:#fff;--surface-2:#f4f2f0;--text:#1c1b19;--dim:#6b6763;--border:#e3dfdb;
+    --accent:#b8562f;--accent-soft:#fdf0e9;--ok:#2f7a55;--ok-soft:#e8f4ed;--warn:#8a6410;--warn-soft:#fbf2dd;
+    --cool:#35618e;--cool-soft:#e9f0f8;--mute:#5d5a66;--mute-soft:#efeef2;
+    --shadow:0 1px 2px rgba(28,27,25,.05),0 8px 24px -12px rgba(28,27,25,.14)}
+  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+    --bg:#17161a;--surface:#1f1e23;--surface-2:#27262c;--text:#ece9e6;--dim:#a09b98;--border:#34323a;
+    --accent:#e8926a;--accent-soft:#3a2519;--ok:#6cc094;--ok-soft:#1c3329;--warn:#d9b061;--warn-soft:#33290f;
+    --cool:#86b3e0;--cool-soft:#1b2b3d;--mute:#a9a5b5;--mute-soft:#2b2a33;
+    --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px -12px rgba(0,0,0,.6)}}
+  :root[data-theme="dark"]{--bg:#17161a;--surface:#1f1e23;--surface-2:#27262c;--text:#ece9e6;--dim:#a09b98;
+    --border:#34323a;--accent:#e8926a;--accent-soft:#3a2519;--ok:#6cc094;--ok-soft:#1c3329;--warn:#d9b061;
+    --warn-soft:#33290f;--cool:#86b3e0;--cool-soft:#1b2b3d;--mute:#a9a5b5;--mute-soft:#2b2a33;
+    --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px -12px rgba(0,0,0,.6)}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);
+    font:15px/1.55 ui-sans-serif,-apple-system,"Segoe UI",Roboto,Inter,sans-serif;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:960px;margin:0 auto;padding:40px 16px 80px}
+  .eyebrow{font-size:12px;letter-spacing:.09em;text-transform:uppercase;color:var(--accent);font-weight:650}
+  h1{font-size:clamp(26px,5vw,36px);line-height:1.1;margin:8px 0 10px;letter-spacing:-.02em}
+  .lede{color:var(--dim);max-width:66ch;margin:0}
+  .controls{position:sticky;top:0;z-index:5;background:var(--bg);padding:16px 0 12px;margin:22px 0 0;
+    border-bottom:1px solid var(--border)}
+  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+  input[type=search]{flex:1 1 240px;min-width:0;padding:10px 14px;font:inherit;color:var(--text);
+    background:var(--surface);border:1px solid var(--border);border-radius:999px;outline:none}
+  input[type=search]:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+  .chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+  .chip,.btn{padding:6px 12px;font:inherit;font-size:13px;cursor:pointer;white-space:nowrap;background:var(--surface);
+    color:var(--dim);border:1px solid var(--border);border-radius:999px}
+  .chip:hover,.btn:hover{color:var(--text)}
+  .chip[aria-pressed="true"]{background:var(--accent-soft);border-color:var(--accent);color:var(--accent);font-weight:600}
+  .chip .n{opacity:.6;font-variant-numeric:tabular-nums}
+  .count{font-size:13px;color:var(--dim);margin:14px 0 12px}
+  .grid{display:grid;gap:10px}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px;box-shadow:var(--shadow)}
+  .top{display:flex;flex-wrap:wrap;gap:8px 10px;align-items:baseline}
+  h2{font-size:16.5px;font-weight:650;margin:0;letter-spacing:-.01em}
+  .id{font:12px/1.6 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--dim);background:var(--surface-2);
+    padding:1px 7px;border-radius:6px}
+  .badge{font-size:11.5px;font-weight:600;padding:3px 9px;border-radius:999px;white-space:nowrap;margin-left:auto}
+  .b-keyless{background:var(--ok-soft);color:var(--ok)}
+  .b-free{background:var(--cool-soft);color:var(--cool)}
+  .b-card,.b-verify,.b-cn{background:var(--warn-soft);color:var(--warn)}
+  .b-selfhosted{background:var(--mute-soft);color:var(--mute)}
+  .get{display:inline-flex;align-items:baseline;gap:8px;margin-top:10px;color:var(--accent);font-weight:600;
+    text-decoration:none;border-bottom:1px solid currentColor;padding-bottom:1px}
+  .get:hover{opacity:.75}
+  .host{font:12px/1.5 ui-monospace,Menlo,monospace;font-weight:400;opacity:.8}
+  .none{margin:10px 0 0;font-size:14px;color:var(--dim)}
+  .empty{padding:36px 0;text-align:center;color:var(--dim)}
+  footer{margin-top:36px;padding-top:18px;border-top:1px solid var(--border);color:var(--dim);font-size:13px}
+  footer code{background:var(--surface-2);padding:1px 5px;border-radius:5px;font-size:.92em}
+  .hidden{display:none}
+  @media (max-width:560px){.badge{margin-left:0}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="eyebrow">FreeLLMAPI</div>
+  <h1>Supported providers &amp; where to get a key</h1>
+  <p class="lede">Every provider the router can talk to, with the page that issues its API key.
+    Add the key on the dashboard's <strong>Keys</strong> page and the router starts using it.</p>
+
+  <div class="controls">
+    <div class="row">
+      <input type="search" id="q" placeholder="Search providers…" autocomplete="off" aria-label="Search providers">
+      <button class="btn" id="theme">Theme</button>
+    </div>
+    <div class="chips" id="chips">
+      <button class="chip" data-a="keyless" aria-pressed="false" title="Works anonymously — no signup required.">No key needed <span class="n">3</span></button>
+      <button class="chip" data-a="card" aria-pressed="false" title="A payment method must be attached to earn the free allowance.">Card required <span class="n">1</span></button>
+      <button class="chip" data-a="verify" aria-pressed="false" title="Signup needs a Discord or Telegram step beyond the account itself.">Extra verification <span class="n">1</span></button>
+      <button class="chip" data-a="cn" aria-pressed="false" title="The cloud account needs Chinese real-name verification.">CN real-name <span class="n">4</span></button>
+      <button class="chip" data-a="free" aria-pressed="false" title="Signup issues a key without payment details.">Free key <span class="n">39</span></button>
+      <button class="chip" data-a="selfhosted" aria-pressed="false" title="Configured in the dashboard — no third-party signup.">Your own endpoint <span class="n">1</span></button>
+    </div>
+  </div>
+
+  <p class="count" id="count"></p>
+  <div class="grid" id="grid">
+      <article class="card" data-a="free" data-s="google ai studio google">
+        <div class="top">
+          <h2>Google AI Studio</h2>
+          <code class="id">google</code>
+          <span class="badge b-free">Free key</span>
+        </div>
+        <a class="get" href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer">Get an API key <span class="host">aistudio.google.com/apikey</span></a>
+      </article>
+      <article class="card" data-a="free" data-s="groq groq">
+        <div class="top">
+          <h2>Groq</h2>
+          <code class="id">groq</code>
+          <span class="badge b-free">Free key</span>
+        </div>
+        <a class="get" href="https://console.groq.com/keys" target="_blank" rel="noopener noreferrer">Get an API key <span class="host">console.groq.com/keys</span></a>
+      </article>
+      <article class="card" data-a="free" data-s="cerebras cerebras">
+        <div class="top">
+          <h2>Cerebras</h2>
+          <code class="id">cerebras</code>
+          <span class="badge b-free">Free key</span>
+        </div>
+        <a class="get" href="https://cloud.cerebras.ai" target="_blank" rel="noopener noreferrer">Get an API key <span class="host">cloud.cerebras.ai</span></a>
+      </article>
+      <article class="card" data-a="card" data-s="sail research ($5 monthly with payment method) sail">
+        <div class="top">
+          <h2>Sail Research ($5 monthly with payment method)</h2>
+          <code class="id">sail</code>
+          <span class="badge b-card">Card required</span>
+        </div>
+        <a class="get" href="https://app.sailresearch.com" target="_blank" rel="noopener noreferrer">Get an API key <span class="host">app.sailresearch.com</span></a>
+      </article>
+      <article class="card" data-a="free" data-s="electronhub (shared weekly credits) electronhub">
+        <div class="top">
+          <h2>ElectronHub (shared weekly credits)</h2>
+          <code class="id">electronhub</code>
+          <span class="badge b-free">Free key</span>
+        </div>
+        <a class="get" href="https://app.electronhub.ai" target="_blank" rel="noopener noreferrer">Get an API key <span class="host">app.electronhub.ai</span></a>
+      </article>
+      <article class="card" data-a="free" data-s="experiential labs (shared monthly credits) experiential">
+        <div class="top">
+          <h2>Experiential Labs (shared monthly credits)</h2>
+          <code class="id">experiential</code>
+          <span class="badge b-free">Free key</span>
+        </div>
+        <a class="get" href="https://platform.experientiallabs.ai" target="_blank" rel="noopener noreferrer">Get an API key <span class="host">platform.experientiallabs.ai</span></a>
+      </article>
+      <article class="card" data-a="free" data-s="router9 (shared monthly credits) router9">
+        <div class="top">
+          <h2>Router9 (shared monthly credits)</h2>
+          <code class="id">router9</code>
+          <span class="badge b-free">Free key</span>
+        </div>
+        <a class="get" href="https://www.router9.com" target="_blank" rel="noopener noreferrer">Get an API key <span class="host">www.router9.com</span></a>
+      </article>
+      <article class="card" data-a="free" data-s="septor labs (daily free-model quota) septor">
+        <div class="top">
+          <h2>Septor Labs (daily free-model quota)</h2>
+          <code class="id">septor</code>
+          <span class="badge b-free">Free key</span>
+        </div>
+        <a class="get" href="https://septorlabs.com/dashboard" target="_blank" rel="noopener noreferrer">Get an API key <span class="host">septorlabs.com/dashboard</span></a>
+      </article>
+      <article class="card" data-a="free" data-s="clōd (shared daily free requests) clod">
+        <div class="top">
+          <h2>CLōD (shared daily free requests)</h2>
+          <code class="id">clod</code>
+          <span class="badge b-free">Free key</span>
+        </div>
+        <a class="get" href="https://newapp.clod.io" target="_blank" rel="noopener noreferrer">Get an API key <span class="host">newapp.clod.io</span></a>
+      </article>
+      <article class="card" data-a="free" data-s="speechify (monthly free tts characters) speechify">
+        <div class="top">
+          <h2>Speechify (monthly free TTS characters)</h2>
+          <code class="id">speechify</code>
+          <span class="badge b-free">Free key</span>
+        </div>
+        <a class="get" href="https://platform.speechify.ai" target="_blank" rel="noopener noreferrer">Get an API key <span class="host">platform.speechify.ai</span></a>
+      </article>
+      <article class="card" data-a="verify" data-s="blazeapi (daily free tokens; discord verification) blaze">
+        <div class="top">
+          <h2>BlazeAPI (daily free tokens; Discord verification)</h2>
+          <code class="id">blaze</code>
+          <span class="badge b-verify">Extra verification</span>
+        </div>
+        <a class="get" href="https://blazeapi.org/dashboard" target="_blank" rel="noopener noreferrer">Get an API key <span class="host">blazeapi.org/dashboard</span></a>
+      </article>
+      <article class="card" data-a="free" data-s="b.ai (promotional free model) bai">
+        <div class="top">
+          <h2>B.AI (promotional free model)</h2>
+          <code class="id">bai</code>
+          <span class="badge b-free">Free key</span>
+        </div>
+        <a class="get" href="https://b.ai" target="_blank" rel="noopener noreferrer">Get an API key <span class="host">b.ai</span></a>
+      </article>
+      <article class="card" data-a="free" data-s="amd radeon cloud (free shared models) radeon">
+        <div class="top">
+          <h2>AMD Radeon Cloud (free shared models)</h2>
+          <code class="id">radeon</code>
+          <span class="badge b-free">Free key</span>
+        </div>
+        <a class="get" href="https://developer.amd.com.cn/radeon/tokenfactory" target="_blank" rel="noopener noreferrer">Get an API key <span class="host">developer.amd.com.cn/radeon/tokenfactory</span></a>
+      </article>
+      <article class="card" data-a="free" data-s="nvidia nim nvidia">
+        <div class="top">
+          <h2>NVIDIA NIM</h2>
+          <code class="id">nvidia</code>
+          <span class="badge b-free">Free key</span>
+        </div>
+        <a class="get" href="https://build.nvidia.com/settings/api-keys" target="_blank" rel="noopener noreferrer">Get an API key <span class="host">build.nvidia.com/settings/api-keys</span></a>
+      </article>
+      <article class="card" data-a="free" data-s="mistral mistral">
+        <div class="top">
+          <h2>Mistral</h2>
+          <code class="id">mistral</code>
+          <span class="badge b-free">Free key</span>
+        </div>
+        <a class="get" href="https://console.mistral.ai/api-keys/" target="_blank" rel="noopener noreferrer">Get an API key <span class="host">console.mistral.ai/api-keys/</span></a>
+      </article>
+      <article class="card" data-a="free" data-s="openrouter openrouter">
+        <div class="top">
+          <h2>OpenRouter</h2>
+          <code class="id">openrouter</code>
+          <span class="badge b-free">Free key</span>
+        </div>
+        <a class="get" href="https://openrouter.ai/keys" target="_blank" rel="noopener noreferrer">Get an API key <span class="host">openrouter.ai/keys</span></a>
+      </article>
+      <article class="card" data-a="free" data-s="github models github">
+        <div class="top">
+          <h2>GitHub Models</h2>
+          <code class="id">github</code>
+          <span class="badge b-free">Free key</span>
+        </div>
+        <a class="get" href="https://github.com/settings/tokens" target="_blank" rel="noopener noreferrer">Get an API key <span class="host">github.com/settings/tokens</span></a>
+      </article>
+      <article class="card" data-a="free" data-s="cohere cohere">
+        <div class="top">
+          <h2>Cohere</h2>
+          <code class="id">cohere</code>
+          <span class="badge b-free">Free key</span>
+        </div>
+        <a class="get" href="https://dashboard.cohere.com/api-keys" target="_blank" rel="noopener noreferrer">Get an API key <span class="host">dashboard.cohere.com/api-keys</span></a>
+      </article>
+      <article class="card" data-a="free" data-s="cloudflare workers ai cloudflare">
+        <div class="top">
+          <h2>Cloudflare Workers AI</h2>
+          <code class="id">cloudflare</code>
+          <span class="badge b-free">Free key</span>
+        </div>
+        <a class="get" href="https://dash.cloudflare.com" target="_blank" rel="noopener noreferrer">Get an API key <span class="host">dash.cloudflare.com</span></a>
+      </article>
+      <article class="card" data-a="free" data-s="zhipu ai (z.ai) zhipu">
+        <div class="top">
+          <h2>Zhipu AI (Z.ai)</h2>
+          <code class="id">zhipu</code>
+          <span class="badge b-free">Free key</span>
+        </div>
+        <a class="get" href="https://z.ai/manage-apikey/apikey-list" target="_blank" rel="noopener noreferrer">Get an API key <span class="host">z.ai/manage-apikey/apikey-list</span></a>
+      </article>
+      <article class="card" data-a="free" data-s="ollama cloud ollama">
+        <div class="top">
+          <h2>Ollama Cloud</h2>
+          <code class="id">ollama</code>
+          <span class="badge b-free">Free key</span>
+        </div>
+        <a class="get" href="https://ollama.com/settings/keys" target="_blank" rel="noopener noreferrer">Get an API key <span class="host">ollama.com/settings/keys</span></a>
+      </article>
+      <article class="card" data-a="keyless" data-s="kilo gateway (no key needed) kilo">
+        <div class="top">
+          <h2>Kilo Gateway (no key needed)</h2>
+          <code class="id">kilo</code>
+          <span class="badge b-keyless">No key needed</span>
+        </div>
+        <a class="get" href="https://app.kilo.ai" target="_blank" rel="noopener noreferrer">Get an API key <span class="host">app.kilo.ai</span></a>
+      </article>
+      <article class="card" data-a="free" data-s="pollinations pollinations">
+        <div class="top">
+          <h2>Pollinations</h2>
+          <code class="id">pollinations</code>
+          <span class="badge b-free">Free key</span>
+        </div>
+        <a class="get" href="https://enter.pollinations.ai" target="_blank" rel="noopener noreferrer">Get an API key <span class="host">enter.pollinations.ai</span></a>
+      </article>
+      <article class="card" data-a="keyless" data-s="ovh ai endpoints (no key needed) ovh">
+        <div class="top">
+          <h2>OVH AI Endpoints (no key needed)</h2>
+          <code class="id">ovh</code>
+          <span class="badge b-keyless">No key needed</span>
+        </div>
+        <a class="get" href="https://endpoints.ai.cloud.ovh.net" target="_blank" rel="noopener noreferrer">Get an API key <span class="host">endpoints.ai.cloud.ovh.net</span></a>
+      </article>
+      <article class="card" data-a="free" data-s="llm7 (anon ok) llm7">
+        <div class="top">
+          <h2>LLM7 (anon ok)</h2>
+          <code class="id">llm7</code>
+          <span class="badge b-free">Free key</span>
+        </div>
+        <a class="get" href="https://llm7.io" target="_blank" rel="noopener noreferrer">Get an API key <span class="host">llm7.io</span></a>
+      </article>
+      <article class="card" data-a="free" data-s="huggingface router huggingface">
+        <div class="top">
+          <h2>HuggingFace Router</h2>
+          <code class="id">huggingface</code>
+          <span class="badge b-free">Free key</span>
+        </div>
+        <a class="get" href="https://huggingface.co/settings/tokens" target="_blank" rel="noopener noreferrer">Get an API key <span class="host">huggingface.co/settings/tokens</span></a>
+      </article>
+      <article class="card" data-a="free" data-s="opencode zen (free key) opencode">
+        <div class="top">
+          <h2>OpenCode Zen (free key)</h2>
+          <code class="id">opencode</code>
+          <span class="badge b-free">Free key</span>
+        </div>
+        <a class="get" href="https://opencode.ai/auth" target="_blank" rel="noopener noreferrer">Get an API key <span class="host">opencode.ai/auth</span></a>
+      </article>
+      <article class="card" data-a="free" data-s="agnes ai (free key) agnes">
+        <div class="top">
+          <h2>Agnes AI (free key)</h2>
+          <code class="id">agnes</code>
+          <span class="badge b-free">Free key</span>
+        </div>
+        <a class="get" href="https://platform.agnes-ai.com" target="_blank" rel="noopener noreferrer">Get an API key <span class="host">platform.agnes-ai.com</span></a>
+      </article>
+      <article class="card" data-a="free" data-s="reka (free key) reka">
+        <div class="top">
+          <h2>Reka (free key)</h2>
+          <code class="id">reka</code>
+          <span class="badge b-free">Free key</span>
+        </div>
+        <a class="get" href="https://platform.reka.ai" target="_blank" rel="noopener noreferrer">Get an API key <span class="host">platform.reka.ai</span></a>
+      </article>
+      <article class="card" data-a="free" data-s="siliconflow (image + tts) siliconflow">
+        <div class="top">
+          <h2>SiliconFlow (image + TTS)</h2>
+          <code class="id">siliconflow</code>
+          <span class="badge b-free">Free key</span>
+        </div>
+        <a class="get" href="https://siliconflow.com" target="_blank" rel="noopener noreferrer">Get an API key <span class="host">siliconflow.com</span></a>
+      </article>
+      <article class="card" data-a="free" data-s="routeway (free key) routeway">
+        <div class="top">
+          <h2>Routeway (free key)</h2>
+          <code class="id">routeway</code>
+          <span class="badge b-free">Free key</span>
+        </div>
+        <a class="get" href="https://routeway.ai" target="_blank" rel="noopener noreferrer">Get an API key <span class="host">routeway.ai</span></a>
+      </article>
+      <article class="card" data-a="free" data-s="bazaarlink (free key) bazaarlink">
+        <div class="top">
+          <h2>BazaarLink (free key)</h2>
+          <code class="id">bazaarlink</code>
+          <span class="badge b-free">Free key</span>
+        </div>
+        <a class="get" href="https://bazaarlink.ai" target="_blank" rel="noopener noreferrer">Get an API key <span class="host">bazaarlink.ai</span></a>
+      </article>
+      <article class="card" data-a="free" data-s="ainative studio (free key) ainative">
+        <div class="top">
+          <h2>AINative Studio (free key)</h2>
+          <code class="id">ainative</code>
+          <span class="badge b-free">Free key</span>
+        </div>
+        <a class="get" href="https://ainative.studio" target="_blank" rel="noopener noreferrer">Get an API key <span class="host">ainative.studio</span></a>
+      </article>
+      <article class="card" data-a="free" data-s="aion labs (free key) aion">
+        <div class="top">
+          <h2>Aion Labs (free key)</h2>
+          <code class="id">aion</code>
+          <span class="badge b-free">Free key</span>
+        </div>
+        <a class="get" href="https://www.aionlabs.ai" target="_blank" rel="noopener noreferrer">Get an API key <span class="host">www.aionlabs.ai</span></a>
+      </article>
+      <article class="card" data-a="free" data-s="requesty (free key) requesty">
+        <div class="top">
+          <h2>Requesty (free key)</h2>
+          <code class="id">requesty</code>
+          <span class="badge b-free">Free key</span>
+        </div>
+        <a class="get" href="https://www.requesty.ai" target="_blank" rel="noopener noreferrer">Get an API key <span class="host">www.requesty.ai</span></a>
+      </article>
+      <article class="card" data-a="free" data-s="navyai (free key) navy">
+        <div class="top">
+          <h2>NavyAI (free key)</h2>
+          <code class="id">navy</code>
+          <span class="badge b-free">Free key</span>
+        </div>
+        <a class="get" href="https://api.navy" target="_blank" rel="noopener noreferrer">Get an API key <span class="host">api.navy</span></a>
+      </article>
+      <article class="card" data-a="free" data-s="nararouter (free key) nara">
+        <div class="top">
+          <h2>NaraRouter (free key)</h2>
+          <code class="id">nara</code>
+          <span class="badge b-free">Free key</span>
+        </div>
+        <a class="get" href="https://router.bynara.id" target="_blank" rel="noopener noreferrer">Get an API key <span class="host">router.bynara.id</span></a>
+      </article>
+      <article class="card" data-a="free" data-s="sea-lion (free key) sealion">
+        <div class="top">
+          <h2>SEA-LION (free key)</h2>
+          <code class="id">sealion</code>
+          <span class="badge b-free">Free key</span>
+        </div>
+        <a class="get" href="https://sea-lion.ai" target="_blank" rel="noopener noreferrer">Get an API key <span class="host">sea-lion.ai</span></a>
+      </article>
+      <article class="card" data-a="free" data-s="orcarouter (free key) orcarouter">
+        <div class="top">
+          <h2>OrcaRouter (free key)</h2>
+          <code class="id">orcarouter</code>
+          <span class="badge b-free">Free key</span>
+        </div>
+        <a class="get" href="https://www.orcarouter.ai" target="_blank" rel="noopener noreferrer">Get an API key <span class="host">www.orcarouter.ai</span></a>
+      </article>
+      <article class="card" data-a="free" data-s="unorouter (free key) unorouter">
+        <div class="top">
+          <h2>UnoRouter (free key)</h2>
+          <code class="id">unorouter</code>
+          <span class="badge b-free">Free key</span>
+        </div>
+        <a class="get" href="https://unorouter.com" target="_blank" rel="noopener noreferrer">Get an API key <span class="host">unorouter.com</span></a>
+      </article>
+      <article class="card" data-a="free" data-s="xkiro (free key) xkiro">
+        <div class="top">
+          <h2>xKiro (free key)</h2>
+          <code class="id">xkiro</code>
+          <span class="badge b-free">Free key</span>
+        </div>
+        <a class="get" href="https://xkiro.com" target="_blank" rel="noopener noreferrer">Get an API key <span class="host">xkiro.com</span></a>
+      </article>
+      <article class="card" data-a="free" data-s="anyapi (free key) anyapi">
+        <div class="top">
+          <h2>AnyAPI (free key)</h2>
+          <code class="id">anyapi</code>
+          <span class="badge b-free">Free key</span>
+        </div>
+        <a class="get" href="https://anyapi.ai" target="_blank" rel="noopener noreferrer">Get an API key <span class="host">anyapi.ai</span></a>
+      </article>
+      <article class="card" data-a="cn" data-s="modelscope (free key, needs aliyun cn binding) modelscope">
+        <div class="top">
+          <h2>ModelScope (free key, needs Aliyun cn binding)</h2>
+          <code class="id">modelscope</code>
+          <span class="badge b-cn">CN real-name</span>
+        </div>
+        <a class="get" href="https://modelscope.cn/my/myaccesstoken" target="_blank" rel="noopener noreferrer">Get an API key <span class="host">modelscope.cn/my/myaccesstoken</span></a>
+      </article>
+      <article class="card" data-a="keyless" data-s="ai horde (no key needed, slow) aihorde">
+        <div class="top">
+          <h2>AI Horde (no key needed, slow)</h2>
+          <code class="id">aihorde</code>
+          <span class="badge b-keyless">No key needed</span>
+        </div>
+        <a class="get" href="https://aihorde.net/register" target="_blank" rel="noopener noreferrer">Get an API key <span class="host">aihorde.net/register</span></a>
+      </article>
+      <article class="card" data-a="cn" data-s="baidu qianfan (free ernie, needs cn real-name) qianfan">
+        <div class="top">
+          <h2>Baidu Qianfan (free ERNIE, needs cn real-name)</h2>
+          <code class="id">qianfan</code>
+          <span class="badge b-cn">CN real-name</span>
+        </div>
+        <a class="get" href="https://console.bce.baidu.com/qianfan/overview" target="_blank" rel="noopener noreferrer">Get an API key <span class="host">console.bce.baidu.com/qianfan/overview</span></a>
+      </article>
+      <article class="card" data-a="cn" data-s="volcengine ark (free daily, needs cn real-name) volcengine">
+        <div class="top">
+          <h2>Volcengine Ark (free daily, needs cn real-name)</h2>
+          <code class="id">volcengine</code>
+          <span class="badge b-cn">CN real-name</span>
+        </div>
+        <a class="get" href="https://console.volcengine.com/ark" target="_blank" rel="noopener noreferrer">Get an API key <span class="host">console.volcengine.com/ark</span></a>
+      </article>
+      <article class="card" data-a="free" data-s="longcat (free daily, email signup ok) longcat">
+        <div class="top">
+          <h2>LongCat (free daily, email signup ok)</h2>
+          <code class="id">longcat</code>
+          <span class="badge b-free">Free key</span>
+        </div>
+        <a class="get" href="https://longcat.chat/platform" target="_blank" rel="noopener noreferrer">Get an API key <span class="host">longcat.chat/platform</span></a>
+      </article>
+      <article class="card" data-a="cn" data-s="iflytek spark (free lite, needs cn real-name) xfyun">
+        <div class="top">
+          <h2>iFlytek Spark (free Lite, needs cn real-name)</h2>
+          <code class="id">xfyun</code>
+          <span class="badge b-cn">CN real-name</span>
+        </div>
+        <a class="get" href="https://console.xfyun.cn" target="_blank" rel="noopener noreferrer">Get an API key <span class="host">console.xfyun.cn</span></a>
+      </article>
+      <article class="card" data-a="selfhosted" data-s="custom (openai-compatible) custom">
+        <div class="top">
+          <h2>Custom (OpenAI-compatible)</h2>
+          <code class="id">custom</code>
+          <span class="badge b-selfhosted">Your own endpoint</span>
+        </div>
+        <p class="none">Configured in the dashboard — point it at any OpenAI-compatible endpoint.</p>
+      </article>
+      <p class="empty hidden" id="empty">No provider matches that search.</p>
+  </div>
+
+  <footer>
+    <p><strong>49</strong> entries — 48 providers that issue a key, plus the custom
+      OpenAI-compatible endpoint.</p>
+    <p>This page is generated from <code>client/src/components/keys/shared.tsx</code>, the same registry the dashboard
+      renders, so it cannot drift from what the app actually supports. Regenerate with
+      <code>npm run providers:page</code>. Free-tier terms change often — the linked page is always the authority.</p>
+  </footer>
+</div>
+
+<script>
+  var cards = Array.prototype.slice.call(document.querySelectorAll('.card'));
+  var q = document.getElementById('q');
+  var countEl = document.getElementById('count');
+  var emptyEl = document.getElementById('empty');
+  var active = null;
+
+  function apply() {
+    var term = q.value.trim().toLowerCase();
+    var shown = 0;
+    cards.forEach(function (c) {
+      var ok = (!term || c.dataset.s.indexOf(term) !== -1) && (!active || c.dataset.a === active);
+      c.classList.toggle('hidden', !ok);
+      if (ok) shown++;
+    });
+    emptyEl.classList.toggle('hidden', shown > 0);
+    countEl.textContent = shown === cards.length
+      ? 'Showing all ' + cards.length + ' providers'
+      : 'Showing ' + shown + ' of ' + cards.length + ' providers';
+  }
+
+  q.addEventListener('input', apply);
+  document.getElementById('chips').addEventListener('click', function (e) {
+    var b = e.target.closest('.chip');
+    if (!b) return;
+    active = active === b.dataset.a ? null : b.dataset.a;
+    Array.prototype.forEach.call(document.querySelectorAll('.chip'), function (c) {
+      c.setAttribute('aria-pressed', String(c.dataset.a === active));
+    });
+    apply();
+  });
+  document.getElementById('theme').addEventListener('click', function () {
+    var dark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    var cur = document.documentElement.dataset.theme || (dark ? 'dark' : 'light');
+    document.documentElement.dataset.theme = cur === 'dark' ? 'light' : 'dark';
+  });
+
+  apply();
+</script>
+</body>
+</html>
