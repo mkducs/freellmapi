@@ -41,6 +41,7 @@ const RESPONSE_CACHE_FILENAME = '20260903_000002_response_cache.ts';
 const KEY_MONTHLY_BUDGET_FILENAME = '20260904_000001_key_monthly_budget.ts';
 const KEY_MONTHLY_USAGE_FILENAME = '20260914_000001_key_monthly_usage.ts';
 const PROVIDER_REGISTRY_FILENAME = '20260919_000001_provider_registry.ts';
+const KEY_ACCOUNT_GROUP_FILENAME = '20260922_000001_key_account_group.ts';
 
 interface SchemaRow {
   type: string;
@@ -128,6 +129,7 @@ describe('migration round trip', () => {
         KEY_MONTHLY_BUDGET_FILENAME,
         KEY_MONTHLY_USAGE_FILENAME,
         PROVIDER_REGISTRY_FILENAME,
+        KEY_ACCOUNT_GROUP_FILENAME,
       ]);
     } finally {
       db.close();

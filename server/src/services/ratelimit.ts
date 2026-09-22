@@ -47,6 +47,66 @@ function withDb<T>(fn: (db: RateLimitDb) => T): T | undefined {
   }
 }
 
+// ── Same-account key grouping ────────────────────────────────────────────────
+// Account-level gates below (daily requests, per-minute requests, daily tokens,
+// concurrency) meter what the PROVIDER meters, which is an account — not a
+// credential. One key normally is one account, so counting per key is right.
+// It stops being right the moment an operator adds a second key minted from the
+// same account: each would get a full local budget while the provider still
+// meters one, so the router would dispatch up to twice the cap and earn real
+// 429s. `api_keys.account_group` is the operator saying "these share an
+// account"; NULL means ungrouped, which is every pre-existing row.
+//
+// Cached because the gates run on every routing decision while api_keys changes
+// rarely. The TTL is short and `invalidateAccountGroups()` clears it on key
+// writes, so an edited group takes effect immediately rather than after a
+// window of silent mis-metering.
+const ACCOUNT_GROUP_TTL_MS = 30_000;
+let accountGroupCache: { at: number; db: RateLimitDb; groups: Map<number, number[]> } | null = null;
+
+export function invalidateAccountGroups(): void {
+  accountGroupCache = null;
+}
+
+function accountGroupMap(): Map<number, number[]> {
+  const now = Date.now();
+  const db = withDb(d => d);
+  if (!db) return new Map();
+  if (accountGroupCache && accountGroupCache.db === db && now - accountGroupCache.at < ACCOUNT_GROUP_TTL_MS) {
+    return accountGroupCache.groups;
+  }
+
+  const groups = new Map<number, number[]>();
+  const rows = withDb(d => d.prepare(
+    "SELECT id, platform, account_group AS accountGroup FROM api_keys WHERE account_group IS NOT NULL AND TRIM(account_group) <> ''",
+  ).all() as { id: number; platform: string; accountGroup: string }[]);
+  if (rows) {
+    // Scoped by platform as well as group name: the same label on two different
+    // providers is two different upstream accounts, and merging their budgets
+    // would under-serve both.
+    const byGroup = new Map<string, number[]>();
+    for (const row of rows) {
+      const key = `${row.platform}\u0000${row.accountGroup.trim()}`;
+      const list = byGroup.get(key) ?? [];
+      list.push(row.id);
+      byGroup.set(key, list);
+    }
+    for (const ids of byGroup.values()) {
+      if (ids.length < 2) continue; // a group of one is just an ungrouped key
+      for (const id of ids) groups.set(id, ids);
+    }
+  }
+  if (db) accountGroupCache = { at: now, db, groups };
+  return groups;
+}
+
+/** Every key id sharing this one's upstream account, including itself. Just
+ *  `[keyId]` when the key is ungrouped, which keeps the pre-grouping behaviour
+ *  byte for byte. */
+export function accountKeyIds(keyId: number): number[] {
+  return accountGroupMap().get(keyId) ?? [keyId];
+}
+
 // ── In-flight leases ──────────────────────────────────────────────────────────
 // Usage is only recorded *after* an attempt succeeds, so between key selection
 // and that write the router has no idea a request is already in the air. A lease
@@ -108,9 +168,12 @@ export function getKeyConcurrencyLimit(platform: string): number | null {
 /** Requests this process currently has in flight against one platform+key. */
 export function inFlightForKey(platform: string, keyId: number, now = Date.now()): number {
   pruneLeases(now);
+  // Concurrency is metered per account too: several keys on one account firing
+  // in parallel are parallel requests to that account, not to separate ones.
+  const keyIds = new Set(accountKeyIds(keyId));
   let count = 0;
   for (const lease of leases.values()) {
-    if (lease.platform === platform && lease.keyId === keyId) count++;
+    if (lease.platform === platform && keyIds.has(lease.keyId)) count++;
   }
   return count;
 }
@@ -614,19 +677,20 @@ export function getProviderDailyTokenCap(platform: string): number | null {
 
 function countPersistedProviderRequests(
   platform: string,
-  keyId: number,
+  keyIds: number[],
   windowMs: number,
   now: number,
 ): number | undefined {
   return withDb(db => {
+    const placeholders = keyIds.map(() => '?').join(', ');
     const row = db.prepare(`
       SELECT COUNT(*) AS used
         FROM rate_limit_usage
        WHERE platform = ?
-         AND key_id = ?
+         AND key_id IN (${placeholders})
          AND kind = 'request'
          AND created_at_ms > ?
-    `).get(platform, keyId, now - windowMs) as { used: number };
+    `).get(platform, ...keyIds, now - windowMs) as { used: number };
     return row.used;
   });
 }
@@ -638,14 +702,18 @@ function countPersistedProviderRequests(
 // at 23:00 UTC would still be counted against the account at 22:00 the next day.
 export function providerDailyRequestCount(platform: string, keyId: number, now = Date.now()): number {
   const windowMs = msSinceUtcMidnight(now);
-  const persisted = countPersistedProviderRequests(platform, keyId, windowMs, now);
+  const keyIds = accountKeyIds(keyId);
+  const persisted = countPersistedProviderRequests(platform, keyIds, windowMs, now);
   if (persisted !== undefined) return persisted;
-  // DB-unavailable fallback: sum the per-model rpd windows for this platform+key.
-  // Window key format is "platform:modelId:keyId:rpd" (modelId may contain ':').
+  // DB-unavailable fallback: sum the per-model rpd windows for every key on this
+  // account. Window key format is "platform:modelId:keyId:rpd" (modelId may
+  // contain ':').
   let total = 0;
-  for (const [key, w] of windows) {
-    if (key.startsWith(`${platform}:`) && key.endsWith(`:${keyId}:rpd`)) {
-      total += pruneTimestamps(w.timestamps, windowMs, now).length;
+  for (const id of keyIds) {
+    for (const [key, w] of windows) {
+      if (key.startsWith(`${platform}:`) && key.endsWith(`:${id}:rpd`)) {
+        total += pruneTimestamps(w.timestamps, windowMs, now).length;
+      }
     }
   }
   return total;
@@ -662,13 +730,16 @@ export function canUseProvider(platform: string, keyId: number, now = Date.now()
 
 /** Requests in the last minute for a provider account+key, across every model. */
 export function providerMinuteRequestCount(platform: string, keyId: number, now = Date.now()): number {
-  const persisted = countPersistedProviderRequests(platform, keyId, MINUTE, now);
+  const keyIds = accountKeyIds(keyId);
+  const persisted = countPersistedProviderRequests(platform, keyIds, MINUTE, now);
   if (persisted !== undefined) return persisted;
-  // DB-unavailable fallback: sum the per-model rpm windows for this platform+key.
+  // DB-unavailable fallback: sum the per-model rpm windows across the account.
   let total = 0;
-  for (const [key, w] of windows) {
-    if (key.startsWith(`${platform}:`) && key.endsWith(`:${keyId}:rpm`)) {
-      total += pruneTimestamps(w.timestamps, MINUTE, now).length;
+  for (const id of keyIds) {
+    for (const [key, w] of windows) {
+      if (key.startsWith(`${platform}:`) && key.endsWith(`:${id}:rpm`)) {
+        total += pruneTimestamps(w.timestamps, MINUTE, now).length;
+      }
     }
   }
   return total;
@@ -723,7 +794,7 @@ function providerBilledTokens(platform: string, modelId: string, rawTokens: numb
 
 function sumPersistedProviderTokens(
   platform: string,
-  keyId: number,
+  keyIds: number[],
   windowMs: number,
   now: number,
 ): number | undefined {
@@ -737,11 +808,11 @@ function sumPersistedProviderTokens(
         FROM rate_limit_usage rlu
         LEFT JOIN models m ON m.platform = rlu.platform AND m.model_id = rlu.model_id
        WHERE rlu.platform = ?
-         AND rlu.key_id = ?
+         AND rlu.key_id IN (${keyIds.map(() => '?').join(', ')})
          AND rlu.kind = 'tokens'
          AND rlu.created_at_ms > ?
        GROUP BY rlu.model_id
-    `).all(platform, keyId, now - windowMs) as (ModelQuotaRow & { model_id: string; used: number })[];
+    `).all(platform, ...keyIds, now - windowMs) as (ModelQuotaRow & { model_id: string; used: number })[];
 
     return rows.reduce((sum, row) => {
       const multiplier = platform === 'navy' ? multiplierFromQuotaRow(row, dailyCap) : 1;
@@ -753,20 +824,23 @@ function sumPersistedProviderTokens(
 // Midnight-UTC boundary, for the same reason as providerDailyRequestCount.
 export function providerDailyTokenCount(platform: string, keyId: number, now = Date.now()): number {
   const windowMs = msSinceUtcMidnight(now);
-  const persisted = sumPersistedProviderTokens(platform, keyId, windowMs, now);
+  const keyIds = accountKeyIds(keyId);
+  const persisted = sumPersistedProviderTokens(platform, keyIds, windowMs, now);
   if (persisted !== undefined) return persisted;
 
   let total = 0;
-  const suffix = `:${keyId}:tpd`;
-  for (const [key, w] of windows) {
-    if (!key.startsWith(`${platform}:`) || !key.endsWith(suffix)) continue;
-    const modelId = key.slice(platform.length + 1, -suffix.length);
-    // Read-only: the tpd window is shared with the per-model 24h token check, so
-    // narrowing it to the midnight boundary here must not prune the stored entries.
-    const raw = w.tokenTimestamps
-      .filter(t => t.ts > now - windowMs)
-      .reduce((sum, t) => sum + t.tokens, 0);
-    total += providerBilledTokens(platform, modelId, raw);
+  for (const id of keyIds) {
+    const suffix = `:${id}:tpd`;
+    for (const [key, w] of windows) {
+      if (!key.startsWith(`${platform}:`) || !key.endsWith(suffix)) continue;
+      const modelId = key.slice(platform.length + 1, -suffix.length);
+      // Read-only: the tpd window is shared with the per-model 24h token check, so
+      // narrowing it to the midnight boundary here must not prune the stored entries.
+      const raw = w.tokenTimestamps
+        .filter(t => t.ts > now - windowMs)
+        .reduce((sum, t) => sum + t.tokens, 0);
+      total += providerBilledTokens(platform, modelId, raw);
+    }
   }
   return total;
 }

@@ -264,3 +264,44 @@ classification.
 **Reversal condition.** If PLATFORMS ever moves into a plain data module (JSON
 or a `.ts` with no JSX imports), replace the parser with a direct import — the
 generator and its tests stay, only the parse changes.
+
+---
+
+## DL-0010 — Account-level gates meter an account, not a credential
+
+Date: 2026-09-22 · Status: Accepted · Confidence: High
+
+**Decision.** Add `api_keys.account_group` and have all four account-level gates
+— daily requests, per-minute requests, daily tokens, in-flight concurrency —
+count across every key sharing a group. NULL (every existing row) means
+ungrouped and keeps the previous per-key behaviour exactly.
+
+**Reasoning.** The gates exist to mirror what the provider meters, and providers
+meter accounts. Counting per key is a correct proxy only while one key means one
+account. The moment an operator adds a second key from the same account, each
+gets a full local budget while the provider still meters one, so the router
+dispatches up to 2× the cap and collects real 429s — adding a key makes
+throughput *worse*. The codebase already models the provider half of this
+distinction (`inferQuotaPoolKey` returns `::account` pools, and remaining-quota
+weighting is skipped for them because every key reports the same number); this
+adds the key half.
+
+**Scoped by platform, not just group name.** The same label on two providers is
+two different upstream accounts.
+
+**A group of one is treated as ungrouped**, so a half-finished grouping does not
+take a different code path for no behavioural reason.
+
+**Not used for selection.** Grouped keys still rotate independently: one dead
+key must not take its whole group out of rotation. This changes accounting only.
+
+**Rejected.** (a) Auto-detecting shared accounts from key prefixes or provider
+responses — provider APIs do not expose account identity reliably, and inferring
+it would be inventing a fact (Section 14). (b) Making the router prefer one key
+per group — that trades a metering bug for a reliability regression. (c) Leaving
+it alone and documenting the footgun — the failure is silent and looks like the
+provider being flaky.
+
+**Follow-up, deliberately not bundled.** No dashboard control ships here; a
+group is set through `PATCH /api/keys/:id`. Adding the field to the key dialog
+is a small, separable change.

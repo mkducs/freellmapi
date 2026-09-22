@@ -36,6 +36,7 @@ import * as responseCache from '../migrations/20260903_000002_response_cache.js'
 import * as keyMonthlyBudget from '../migrations/20260904_000001_key_monthly_budget.js';
 import * as keyMonthlyUsage from '../migrations/20260914_000001_key_monthly_usage.js';
 import * as providerRegistry from '../migrations/20260919_000001_provider_registry.js';
+import * as keyAccountGroup from '../migrations/20260922_000001_key_account_group.js';
 
 export interface MigrationModule {
   up(db: Db): void;
@@ -84,6 +85,7 @@ export const RESPONSE_CACHE_FILENAME = '20260903_000002_response_cache.ts';
 export const KEY_MONTHLY_BUDGET_FILENAME = '20260904_000001_key_monthly_budget.ts';
 export const KEY_MONTHLY_USAGE_FILENAME = '20260914_000001_key_monthly_usage.ts';
 export const PROVIDER_REGISTRY_FILENAME = '20260919_000001_provider_registry.ts';
+export const KEY_ACCOUNT_GROUP_FILENAME = '20260922_000001_key_account_group.ts';
 
 export const DEFAULT_MIGRATIONS: readonly DefaultMigration[] = [
   { filename: LEGACY_BASELINE_FILENAME, module: legacyBaseline },
@@ -123,4 +125,5 @@ export const DEFAULT_MIGRATIONS: readonly DefaultMigration[] = [
   { filename: KEY_MONTHLY_BUDGET_FILENAME, module: keyMonthlyBudget },
   { filename: KEY_MONTHLY_USAGE_FILENAME, module: keyMonthlyUsage },
   { filename: PROVIDER_REGISTRY_FILENAME, module: providerRegistry },
+  { filename: KEY_ACCOUNT_GROUP_FILENAME, module: keyAccountGroup },
 ];

@@ -382,6 +382,12 @@ export interface ApiKey {
   modelScope?: string[] | null;
   /** The per-key proxy override with its password masked (#590); '' = none. */
   maskedProxyUrl?: string;
+  /** Operator-assigned marker that this key shares an upstream ACCOUNT with
+   *  other keys on the same platform. Account-level gates (daily requests,
+   *  per-minute requests, daily tokens, concurrency) then meter the group as
+   *  one, because that is what the provider meters. null = ungrouped, the
+   *  default and the pre-existing behaviour. */
+  accountGroup?: string | null;
   models?: ApiKeyModel[];
   cooldowns?: ApiKeyCooldown[];
 }

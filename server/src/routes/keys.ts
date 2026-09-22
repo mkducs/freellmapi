@@ -9,7 +9,7 @@ import { encrypt, decrypt, maskKey } from '../lib/crypto.js';
 import { parseKeysFromFile, stripJsoncComments, stripTrailingCommas } from '../lib/key-parser.js';
 import { assessProviderUrl } from '../lib/url-guard.js';
 import { verifyCredentials } from '../services/auth.js';
-import { getActiveCooldownsForKeys, clearCooldownsForKey } from '../services/ratelimit.js';
+import { getActiveCooldownsForKeys, clearCooldownsForKey, invalidateAccountGroups } from '../services/ratelimit.js';
 import { getMonthlyBudgetCaps } from '../services/key-budget.js';
 import { resolveCustomEndpointKey, customEndpointKeyIds, siblingEndpointKeyId, endpointHasCredential } from '../services/custom-endpoint.js';
 import { registerCustomModels, registerCustomChatModels } from '../services/custom-model-register.js';
@@ -76,13 +76,16 @@ const updateKeySchema = z.object({
   modelScope: z.array(z.string().trim().min(1).max(200)).max(100).nullable().optional(),
   // #590: '' clears the per-key proxy; absent leaves it unchanged.
   proxyUrl: proxyUrlSchema.optional(),
+  // Same-account grouping: keys sharing a group name on one platform are
+  // metered as a single upstream account. '' or null clears it.
+  accountGroup: z.string().trim().max(120).nullable().optional(),
   // Monthly budget caps (#1158): 0 clears the cap (unlimited).
   monthlyRequestCap: z.number().int().min(0).max(1_000_000_000).optional(),
   monthlyTokenCap: z.number().int().min(0).max(1_000_000_000_000).optional(),
   // An absent credential leaves the encrypted key untouched.
   key: z.string().trim().min(1).optional(),
-}).refine(data => data.enabled !== undefined || data.label !== undefined || data.modelScope !== undefined || data.proxyUrl !== undefined || data.key !== undefined || data.monthlyRequestCap !== undefined || data.monthlyTokenCap !== undefined, {
-  message: 'At least one of enabled, label, modelScope, proxyUrl, key, monthlyRequestCap or monthlyTokenCap must be provided',
+}).refine(data => data.enabled !== undefined || data.label !== undefined || data.modelScope !== undefined || data.proxyUrl !== undefined || data.key !== undefined || data.accountGroup !== undefined || data.monthlyRequestCap !== undefined || data.monthlyTokenCap !== undefined, {
+  message: 'At least one of enabled, label, modelScope, proxyUrl, key, accountGroup, monthlyRequestCap or monthlyTokenCap must be provided',
 });
 
 const importKeySchema = z.object({
@@ -334,6 +337,8 @@ keysRouter.get('/', (_req: Request, res: Response) => {
       lastHealthError: row.last_health_error ?? null,
       // The model_id list this key is limited to; null = serves everything (#657).
       modelScope: scope ? [...scope] : null,
+      // Keys sharing this marker are metered as one upstream account.
+      accountGroup: row.account_group?.trim() ? row.account_group.trim() : null,
       // The per-key proxy override with its password masked (#590). '' = no
       // override. Enough for the dashboard to show that a key routes through
       // its own exit, without handing the proxy credentials back out.
@@ -1518,7 +1523,7 @@ keysRouter.patch('/:id', (req: Request, res: Response) => {
     return;
   }
 
-  const { enabled, label, modelScope, proxyUrl, key, monthlyRequestCap, monthlyTokenCap } = parsed.data;
+  const { enabled, label, modelScope, proxyUrl, key, accountGroup, monthlyRequestCap, monthlyTokenCap } = parsed.data;
   const updates: string[] = [];
   const values: (string | number | null)[] = [];
   let changedKey: string | undefined;
@@ -1581,6 +1586,12 @@ keysRouter.patch('/:id', (req: Request, res: Response) => {
     updates.push('monthly_token_cap = ?');
     values.push(monthlyTokenCap);
   }
+  // Same-account grouping: a blank name stores NULL, which the rate limiter
+  // reads as "ungrouped" and meters per key exactly as before.
+  if (accountGroup !== undefined) {
+    updates.push('account_group = ?');
+    values.push(accountGroup && accountGroup.trim() ? accountGroup.trim() : null);
+  }
   // Deduped; an empty result stores NULL, which the router reads as "unscoped".
   const scopeIds = modelScope == null ? [] : [...new Set(modelScope)];
   if (modelScope !== undefined) {
@@ -1603,6 +1614,10 @@ keysRouter.patch('/:id', (req: Request, res: Response) => {
     res.status(404).json({ error: { message: 'Key not found' } });
     return;
   }
+
+  // The rate limiter caches the grouping; a stale entry would keep metering the
+  // old shape, so drop it the moment a key row changes.
+  invalidateAccountGroups();
 
   if (changedKey !== undefined) clearCooldownsForKey(id);
 
